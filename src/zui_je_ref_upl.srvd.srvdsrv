@@ -1,0 +1,5 @@
+@EndUserText.label: 'JE Reference Bulk Upload Service'
+define service ZUI_JE_REF_UPL {
+  expose ZC_JE_REF_UPL_HDR as Upload;
+  expose ZC_JE_REF_UPL_ITM as UploadItem;
+}

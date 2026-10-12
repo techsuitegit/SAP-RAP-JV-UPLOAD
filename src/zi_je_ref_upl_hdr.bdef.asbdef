@@ -1,0 +1,90 @@
+managed implementation in class zbp_i_je_ref_upl_hdr unique;
+
+strict ( 2 );
+
+with draft;
+
+define behavior for ZI_JE_REF_UPL_HDR alias Upload
+persistent table zje_ref_upl_hdr
+draft table zje_ref_upl_hdd
+lock master total etag LastChangedAt
+etag master LocalLastChangedAt
+authorization master ( global )
+early numbering
+{
+  create;
+  update;
+  delete;
+
+  association _Items { create; with draft; }
+
+  field ( readonly ) UploadUUID, CreatedBy, CreatedAt, LastChangedBy,
+                     LocalLastChangedAt, LastChangedAt, Status, Message,
+                     HideExcel, HideResult;
+
+  determination initFlags on modify { create; }
+
+  determination loadExcel on modify { field ExcelAttachment; }
+
+  action ( features : instance ) Execute result [1] $self;
+
+  action ( features : instance ) parseExcel result [1] $self;
+
+  action checkStatus result [1] $self;
+
+  draft action Edit;
+  draft action Activate optimized;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare { }
+
+  mapping for zje_ref_upl_hdr
+  {
+    UploadUUID         = upload_uuid;
+    Status             = status;
+    Message            = message;
+    HideExcel          = hide_excel;
+    HideResult         = hide_result;
+    ExcelAttachment    = excel_attachment;
+    MimeType            = mime_type;
+    FileName            = file_name;
+    CreatedBy           = created_by;
+    CreatedAt           = created_at;
+    LastChangedBy       = last_changed_by;
+    LocalLastChangedAt  = last_changed_at;
+    LastChangedAt       = lastchanged;
+  }
+}
+
+define behavior for ZI_JE_REF_UPL_ITM alias Item
+persistent table zje_ref_upl_itm
+draft table zje_ref_upl_itd
+lock dependent by _Upload
+authorization dependent by _Upload
+early numbering
+{
+  update;
+  delete;
+
+  association _Upload { with draft; }
+
+  field ( readonly ) ItemUUID, UploadUUID, DocumentDate, CustomerName,
+                     BatchID, MessageID, Status, Message;
+
+  mapping for zje_ref_upl_itm
+  {
+    ItemUUID           = item_uuid;
+    UploadUUID         = upload_uuid;
+    DocumentNumber     = document_number;
+    FiscalYear         = fiscal_year;
+    CompanyCode        = company_code;
+    ReferenceID        = reference_id;
+    DocumentDate       = document_date;
+    CustomerName       = customer_name;
+    BatchID             = batch_id;
+    MessageID          = message_id;
+    Status             = status;
+    Message             = message;
+    LocalLastChangedAt = last_changed_at;
+  }
+}

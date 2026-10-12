@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_SIA6" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <SIA6>
+    <MAIN_OBJECT>
+     <NAME>ZJE_REF_UPL_EXT</NAME>
+     <TYPE>SIA6</TYPE>
+     <DESCRIPTION>IAM for JE Bulk Upload</DESCRIPTION>
+     <RESPONSIBLE>CB9980000000</RESPONSIBLE>
+     <MASTER_LANGUAGE>EN</MASTER_LANGUAGE>
+     <MASTER_SYSTEM>X1O</MASTER_SYSTEM>
+     <PACKAGE_REF>
+      <PACKAGE_NAME>ZJE_REF_UPLOAD_APP</PACKAGE_NAME>
+     </PACKAGE_REF>
+     <ABAP_LANGU_VERSION>5</ABAP_LANGU_VERSION>
+    </MAIN_OBJECT>
+    <APP_ID>ZJE_REF_UPL_EXT</APP_ID>
+    <APP_TYPE>EXT</APP_TYPE>
+    <ABAP_LANGUAGE_VERSION>5</ABAP_LANGUAGE_VERSION>
+    <UI_APP_ID>ZJE_REF_UPL_APP_UI5R</UI_APP_ID>
+    <SERVICE>
+     <item>
+      <REL_NAME>ZUI_JE_REF_UPL_O4</REL_NAME>
+      <REL_TYPE>G4BA</REL_TYPE>
+      <APP_ID>ZJE_REF_UPL_EXT</APP_ID>
+      <SRVC_NAME>8EF5703ACA632A3585E74990807CA5</SRVC_NAME>
+      <SRVC_TYPE>HT</SRVC_TYPE>
+      <UIAD_SRC>ZJE_REF_UPL_APP_UI5R</UIAD_SRC>
+      <TEXT>Service Binding for Upload</TEXT>
+      <TYPE_TEXT>OData V4</TYPE_TEXT>
+     </item>
+    </SERVICE>
+    <PUBLISH_STATUS>p</PUBLISH_STATUS>
+    <RTYPE_MIG_STATUS>3</RTYPE_MIG_STATUS>
+   </SIA6>
+  </asx:values>
+ </asx:abap>
+</abapGit>

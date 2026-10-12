@@ -1,0 +1,34 @@
+@Metadata.layer: #CUSTOMER
+@UI.updateHidden: true
+@UI.headerInfo: { typeName: 'Row', typeNamePlural: 'Rows' }
+annotate view ZC_JE_REF_UPL_ITM with
+{
+  @UI.hidden: true
+  ItemUUID;
+  @UI.hidden: true
+  UploadUUID;
+
+  @UI.lineItem: [ { qualifier: 'Excel',  position: 10, label: 'Document Number' },
+                  { qualifier: 'Result', position: 10, label: 'Document No.' } ]
+  DocumentNumber;
+  @UI.lineItem: [ { qualifier: 'Excel', position: 20, label: 'Fiscal Year' } ]
+  FiscalYear;
+  @UI.lineItem: [ { qualifier: 'Excel', position: 30, label: 'Company Code' } ]
+  CompanyCode;
+  @UI.lineItem: [ { qualifier: 'Excel', position: 40, label: 'Reference ID' } ]
+  ReferenceID;
+  @UI.hidden: true 
+  //@UI.lineItem: [ { qualifier: 'Result', position: 20, label: 'Document Date' } ]
+  DocumentDate;
+  @UI.hidden: true 
+  //@UI.lineItem: [ { qualifier: 'Result', position: 30, label: 'Customer' } ]
+  CustomerName;
+  @UI.lineItem: [ { qualifier: 'Result', position: 40, label: 'Batch ID' } ]
+  BatchID;
+  @UI.lineItem: [ { qualifier: 'Result', position: 50, label: 'Message ID' } ]
+  MessageID;
+  @UI.lineItem: [ { qualifier: 'Result', position: 60, label: 'Status' } ]
+  Status;
+  @UI.lineItem: [ { qualifier: 'Result', position: 70, label: 'Message' } ]
+  Message;
+}

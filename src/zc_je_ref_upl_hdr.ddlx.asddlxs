@@ -1,0 +1,53 @@
+@Metadata.layer: #CUSTOMER
+@UI.updateHidden: true
+@UI.headerInfo: {
+  typeName: 'Upload', typeNamePlural: 'Uploads',
+  title: { type: #STANDARD, value: 'FileName' }
+}
+annotate view ZC_JE_REF_UPL_HDR with
+{
+  @UI.facet: [
+    { id: 'File',   purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE,
+      label: 'Excel File', position: 10, targetQualifier: 'File' },
+    { id: 'Rows',   purpose: #STANDARD, type: #LINEITEM_REFERENCE,
+      label: 'Excel Data', position: 20, targetElement: '_Items',
+      targetQualifier: 'Excel', hidden: #(HideExcel) },
+    { id: 'Result', purpose: #STANDARD, type: #LINEITEM_REFERENCE,
+      label: 'Processing Result', position: 30, targetElement: '_Items',
+      targetQualifier: 'Result', hidden: #(HideResult) }
+  ]
+
+  @UI.hidden: true
+  @UI.identification: [
+    { type: #FOR_ACTION, dataAction: 'Execute', label: 'Execute', position: 10 }
+  ]
+  UploadUUID;
+  
+
+  @UI.identification: [{ position: 10, label: 'Excel File', qualifier: 'File' }]
+  ExcelAttachment;
+
+  @UI.lineItem:       [{ position: 10, label: 'File Name' }]
+  @UI.identification: [{ position: 20, label: 'File Name', qualifier: 'File' }]
+  FileName;
+
+  @UI.lineItem:       [{ position: 20, label: 'Status' }]
+  @UI.identification: [{ position: 30, label: 'Status', qualifier: 'File' }]
+  @UI.selectionField: [{ position: 10 }]
+  Status;
+
+  @UI.identification: [{ position: 40, label: 'Message', qualifier: 'File' }]
+  Message;
+
+  @UI.hidden: true
+  HideExcel;
+  @UI.hidden: true
+  HideResult;
+  @UI.hidden: true
+  MimeType;
+
+  @UI.lineItem: [{ position: 30, label: 'Created By' }]
+  CreatedBy;
+  @UI.lineItem: [{ position: 40, label: 'Created At' }]
+  CreatedAt;
+}

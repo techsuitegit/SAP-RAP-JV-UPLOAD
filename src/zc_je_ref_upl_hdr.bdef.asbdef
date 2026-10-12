@@ -1,0 +1,29 @@
+projection;
+strict ( 2 );
+use draft;
+
+define behavior for ZC_JE_REF_UPL_HDR alias Upload
+use etag
+{
+  use create;
+  use update;
+  use delete;
+
+  use action Edit;
+  use action Activate;
+  use action Discard;
+  use action Resume;
+  use action Prepare;
+
+  use action Execute;
+  use action parseExcel;
+  use action checkStatus;
+  use association _Items { create; with draft; }
+}
+
+define behavior for ZC_JE_REF_UPL_ITM alias Item
+{
+  //use update;
+
+  use association _Upload { with draft; }
+}

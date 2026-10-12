@@ -1,0 +1,34 @@
+{
+  "formatVersion": "2",
+  "header": {
+    "description": "JE Reference Update - Excel Upload",
+    "originalLanguage": "en",
+    "abapLanguageVersion": "cloudDevelopment"
+  },
+  "generalInformation": {
+    "appType": "ui5",
+    "catalogId": "SAP_TC_UI5_REPO_UIAD",
+    "targetMappingTitle": "JE Ref Update"
+  },
+  "ui5AppDetails": {
+    "appId": "jerefbulkapp"
+  },
+  "navigation": {
+    "targetMappingId": "ZJE_REF_UPL_APP_UI5R_TM",
+    "semanticObject": "ZJEReferenceUpdate",
+    "action": "manage",
+    "desktop": true,
+    "tablet": true,
+    "phone": true
+  },
+  "tiles": [
+    {
+      "id": "ZJE_REF_UPL_APP_UI5R_AL",
+      "tileType": "static",
+      "isDefault": true,
+      "standard": {
+        "title": "JE Ref Update"
+      }
+    }
+  ]
+}

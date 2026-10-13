@@ -17,7 +17,6 @@ use etag
 
   use action Execute;
   use action parseExcel;
-  use action checkStatus;
   use association _Items { create; with draft; }
 }
 

@@ -23,9 +23,9 @@ annotate view ZC_JE_REF_UPL_ITM with
   @UI.hidden: true 
   //@UI.lineItem: [ { qualifier: 'Result', position: 30, label: 'Customer' } ]
   CustomerName;
-  @UI.lineItem: [ { qualifier: 'Result', position: 40, label: 'Batch ID' } ]
+  @UI.lineItem: [ { qualifier: 'Result', position: 40, label: 'Row No.' } ]
   BatchID;
-  @UI.lineItem: [ { qualifier: 'Result', position: 50, label: 'Message ID' } ]
+  @UI.hidden: true
   MessageID;
   @UI.lineItem: [ { qualifier: 'Result', position: 60, label: 'Status' } ]
   Status;

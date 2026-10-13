@@ -30,8 +30,6 @@ early numbering
 
   action ( features : instance ) parseExcel result [1] $self;
 
-  action checkStatus result [1] $self;
-
   draft action Edit;
   draft action Activate optimized;
   draft action Discard;

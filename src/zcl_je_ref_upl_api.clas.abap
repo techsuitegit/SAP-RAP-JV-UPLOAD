@@ -4,7 +4,10 @@ CLASS zcl_je_ref_upl_api DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    CONSTANTS c_batch_size TYPE i VALUE 10.
+    INTERFACES if_oo_adt_classrun.
+
+    CONSTANTS c_status_updated TYPE c LENGTH 12 VALUE 'UPDATED'.
+    CONSTANTS c_status_error   TYPE c LENGTH 12 VALUE 'ERROR'.
 
     TYPES: BEGIN OF ty_record,
              record_uuid     TYPE sysuuid_x16,
@@ -26,70 +29,79 @@ CLASS zcl_je_ref_upl_api DEFINITION
            END OF ty_result,
            tt_result TYPE STANDARD TABLE OF ty_result WITH EMPTY KEY.
 
+    " iv_commit = abap_false -> inside RAP handler (Execute); the RAP save commits
+    " iv_commit = abap_true  -> ADT console (F9) / application job; commit per document
     METHODS process
       IMPORTING it_records        TYPE tt_record
+                iv_commit         TYPE abap_bool DEFAULT abap_false
       RETURNING VALUE(rt_results) TYPE tt_result.
 
   PRIVATE SECTION.
-
-    CONSTANTS c_sender TYPE string VALUE 'X1O'.
-
-    CONSTANTS c_path TYPE string
-      VALUE '/sap/bc/srt/scs_ext/sap/journalentrybulkchangerequest_'.
-
-    CONSTANTS c_action TYPE string
-      VALUE 'http://sap.com/xi/SAPSCORE/SFIN/JournalEntryBulkChangeRequest_In/JournalEntryBulkChangeRequest_InRequest'.
-
-    " outbound communication of the new package
-    CONSTANTS c_comm_scenario  TYPE string VALUE 'ZJE_REF_UPL_CSCEN'.
-    CONSTANTS c_service_id     TYPE string VALUE 'ZJE_REF_UPL_OS_REST'.
-    CONSTANTS c_comm_system_id TYPE string VALUE 'JEU_SELF'.
-
-    " abap_true only when this app runs in the same tenant as the documents
-    CONSTANTS c_check_existing TYPE abap_bool VALUE abap_false.
-
     METHODS lookup
       IMPORTING is_rec  TYPE ty_record
       EXPORTING ev_date TYPE d
                 ev_name TYPE ty_result-customer_name.
 
-    METHODS build_xml
-      IMPORTING it_batch      TYPE tt_record
-                iv_msgid      TYPE string
-                iv_hid        TYPE string
-      RETURNING VALUE(rv_xml) TYPE string.
-
-    METHODS send_batch
-      IMPORTING it_batch          TYPE tt_record
-                iv_batch_id       TYPE ty_result-batch_id
-      RETURNING VALUE(rt_results) TYPE tt_result.
-
+    METHODS change_reference
+      IMPORTING is_rec    TYPE ty_record
+                iv_commit TYPE abap_bool
+      CHANGING  cs_result TYPE ty_result.
 ENDCLASS.
 
 
 CLASS zcl_je_ref_upl_api IMPLEMENTATION.
 
+  METHOD if_oo_adt_classrun~main.
+    " F9 test only - the app passes the uploaded Excel rows through Execute.
+    " >>> CHANGE: test documents. This REALLY updates the documents.
+    DATA(lt_results) = process(
+      it_records = VALUE #(
+        ( document_number = '1500000173' company_code = '1000' fiscal_year = '2026' reference_id = 'TEST REF 01' )
+        ( document_number = '1500'       company_code = '1000' fiscal_year = '2026' reference_id = 'MUST FAIL'   ) )
+      iv_commit  = abap_true ).
+
+    out->write( lt_results ).
+  ENDMETHOD.
+
+
   METHOD process.
-    DATA(lv_total) = lines( it_records ).
-    DATA(lv_from)  = 1.
-    DATA(lv_batch) = 0.
+    LOOP AT it_records INTO DATA(ls_rec).
+      DATA(ls_result) = VALUE ty_result(
+        record_uuid = ls_rec-record_uuid
+        batch_id    = |{ sy-tabix WIDTH = 5 ALIGN = RIGHT PAD = '0' }| ).
 
-    WHILE lv_from <= lv_total.
-      lv_batch += 1.
-      DATA(lv_to) = nmin( val1 = lv_from + c_batch_size - 1
-                          val2 = lv_total ).
+      " ---- Mandatory values ----
+      IF ls_rec-document_number IS INITIAL
+         OR ls_rec-company_code IS INITIAL
+         OR ls_rec-fiscal_year  IS INITIAL
+         OR ls_rec-reference_id IS INITIAL.
+        ls_result-status  = c_status_error.
+        ls_result-message = 'Mandatory value missing - not updated'.
+        APPEND ls_result TO rt_results.
+        CONTINUE.
+      ENDIF.
 
-      DATA(lt_batch) = VALUE tt_record(
-        FOR i = lv_from THEN i + 1 UNTIL i > lv_to
-          ( it_records[ i ] ) ).
+      " 1500 -> 0000001500
+      ls_rec-document_number = |{ ls_rec-document_number ALPHA = IN }|.
 
-      APPEND LINES OF send_batch(
-        it_batch    = lt_batch
-        iv_batch_id = |{ lv_batch WIDTH = 3 ALIGN = RIGHT PAD = '0' }|
-      ) TO rt_results.
+      " ---- Document must exist (also fills date / BP name) ----
+      lookup( EXPORTING is_rec  = ls_rec
+              IMPORTING ev_date = ls_result-document_date
+                        ev_name = ls_result-customer_name ).
 
-      lv_from = lv_to + 1.
-    ENDWHILE.
+      IF ls_result-document_date IS INITIAL.
+        ls_result-status  = c_status_error.
+        ls_result-message = |Journal entry { ls_rec-document_number }/{ ls_rec-company_code }/{ ls_rec-fiscal_year } not found|.
+        APPEND ls_result TO rt_results.
+        CONTINUE.
+      ENDIF.
+
+      change_reference( EXPORTING is_rec    = ls_rec
+                                  iv_commit = iv_commit
+                        CHANGING  cs_result = ls_result ).
+
+      APPEND ls_result TO rt_results.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -127,149 +139,75 @@ CLASS zcl_je_ref_upl_api IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD build_xml.
-    GET TIME STAMP FIELD DATA(lv_ts).
-    DATA(lv_now) = |{ lv_ts TIMESTAMP = ISO }Z|.
+  METHOD change_reference.
+    DATA lt_je  TYPE TABLE FOR ACTION IMPORT i_journalentrytp~change.
+    DATA lv_msg TYPE string.
 
-    rv_xml =
-      |<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" | &&
-      |xmlns:wsa="http://www.w3.org/2005/08/addressing">| &&
-      |<soapenv:Header>| &&
-      |<wsa:MessageID>uuid:{ iv_msgid }</wsa:MessageID>| &&
-      |<wsa:Action>{ c_action }</wsa:Action>| &&
-      |</soapenv:Header><soapenv:Body>| &&
-      |<sfin:JournalEntryBulkChangeRequestMessage xmlns:sfin="http://sap.com/xi/SAPSCORE/SFIN">| &&
-      |<MessageHeader><ID>{ iv_hid }</ID>| &&
-      |<CreationDateTime>{ lv_now }</CreationDateTime>| &&
-      |<SenderBusinessSystemID>{ c_sender }</SenderBusinessSystemID></MessageHeader>|.
+    APPEND INITIAL LINE TO lt_je ASSIGNING FIELD-SYMBOL(<je>).
 
-    LOOP AT it_batch INTO DATA(ls_rec).
-      DATA(lv_n) = sy-tabix.
-      rv_xml = rv_xml &&
-        |<JournalEntryHeader>| &&
-        |<MessageHeader><ID>{ iv_hid }_{ lv_n WIDTH = 3 ALIGN = RIGHT PAD = '0' }</ID>| &&
-        |<CreationDateTime>{ lv_now }</CreationDateTime></MessageHeader>| &&
-        |<HeaderKey>| &&
-        |<AccountingDocument>{ ls_rec-document_number }</AccountingDocument>| &&
-        |<CompanyCode>{ ls_rec-company_code }</CompanyCode>| &&
-        |<FiscalYear>{ ls_rec-fiscal_year }</FiscalYear>| &&
-        |</HeaderKey>| &&
-        |<DocumentReferenceIDChange>| &&
-        |<DocumentReferenceID>{ escape( val = ls_rec-reference_id format = cl_abap_format=>e_xml_text ) }</DocumentReferenceID>| &&
-        |<FieldValueChangeIsRequested>true</FieldValueChangeIsRequested>| &&
-        |</DocumentReferenceIDChange>| &&
-        |</JournalEntryHeader>|.
-    ENDLOOP.
+    " Only DocumentReferenceID is changed; header text stays as it is
+    DATA ls_header_control LIKE <je>-%param-%control.
+    ls_header_control-documentreferenceid = if_abap_behv=>mk-on.
 
-    rv_xml = rv_xml &&
-      |</sfin:JournalEntryBulkChangeRequestMessage></soapenv:Body></soapenv:Envelope>|.
-  ENDMETHOD.
+    <je>-accountingdocument = is_rec-document_number.
+<je>-fiscalyear         = is_rec-fiscal_year.
+<je>-companycode        = is_rec-company_code.
+<je>-%param = VALUE #( documentreferenceid = is_rec-reference_id
+                           %control            = ls_header_control ).
 
+    MODIFY ENTITIES OF i_journalentrytp
+      ENTITY journalentry
+      EXECUTE change FROM lt_je
+      FAILED   DATA(ls_failed)
+      REPORTED DATA(ls_reported).
 
-  METHOD send_batch.
-    DATA lv_status  TYPE ty_result-status.
-    DATA lv_message TYPE ty_result-message.
-    DATA lv_hid     TYPE string.
-    DATA lt_valid   TYPE tt_record.
+    " ---- Rejected by I_JournalEntryTP ----
+    IF ls_failed IS NOT INITIAL.
+      LOOP AT ls_reported-journalentry INTO DATA(ls_rep).
+        IF ls_rep-%msg IS BOUND.
+          lv_msg = |{ lv_msg } { ls_rep-%msg->if_message~get_text( ) }|.
+        ENDIF.
+      ENDLOOP.
 
-    rt_results = VALUE #( FOR r IN it_batch
-                          ( record_uuid = r-record_uuid
-                            batch_id    = iv_batch_id ) ).
-
-    " ---- check before sending ----
-    LOOP AT it_batch INTO DATA(ls_rec).
-      DATA(lv_idx) = sy-tabix.
-      lookup( EXPORTING is_rec  = ls_rec
-              IMPORTING ev_date = DATA(lv_d)
-                        ev_name = DATA(lv_name) ).
-      rt_results[ lv_idx ]-document_date = lv_d.
-      rt_results[ lv_idx ]-customer_name = lv_name.
-
-      DATA(lv_err) = VALUE string( ).
-      IF ls_rec-document_number IS INITIAL OR ls_rec-company_code IS INITIAL
-         OR ls_rec-fiscal_year IS INITIAL OR ls_rec-fiscal_year = '0000'
-         OR ls_rec-reference_id IS INITIAL.
-        lv_err = 'Mandatory value missing - not sent'.
-      ELSEIF c_check_existing = abap_true AND lv_d IS INITIAL.
-        lv_err = 'Document not found - not sent'.
+      " ROLLBACK ENTITIES is not allowed inside a RAP handler
+      IF iv_commit = abap_true.
+        ROLLBACK ENTITIES.
       ENDIF.
 
-      IF lv_err IS NOT INITIAL.
-        rt_results[ lv_idx ]-status  = 'ERROR'.
-        rt_results[ lv_idx ]-message = lv_err.
-      ELSE.
-        APPEND ls_rec TO lt_valid.
-      ENDIF.
-    ENDLOOP.
-
-    IF lt_valid IS INITIAL.
+      cs_result-status  = c_status_error.
+      cs_result-message = COND #( WHEN lv_msg IS INITIAL THEN 'Change rejected by I_JournalEntryTP'
+                                  ELSE condense( lv_msg ) ).
       RETURN.
     ENDIF.
 
-    TRY.
-        " ID of this request (the ID used in Message Dashboard)
-        GET TIME STAMP FIELD DATA(lv_ts).
-        lv_hid = |JE{ condense( |{ lv_ts }| ) }B{ iv_batch_id }|.
+    " ---- Inside RAP: saved together with the upload ----
+    IF iv_commit = abap_false.
+      cs_result-status  = c_status_updated.
+      cs_result-message = |Reference updated to { is_rec-reference_id }|.
+      RETURN.
+    ENDIF.
 
-        " new unique WS-Addressing message id for every request
-        DATA(lv_c32) = to_lower(
-          cl_uuid_factory=>create_system_uuid( )->create_uuid_c32( ) ).
-        DATA(lv_msgid) =
-          |{ substring( val = lv_c32 off = 0  len = 8 ) }-| &&
-          |{ substring( val = lv_c32 off = 8  len = 4 ) }-| &&
-          |{ substring( val = lv_c32 off = 12 len = 4 ) }-| &&
-          |{ substring( val = lv_c32 off = 16 len = 4 ) }-| &&
-          |{ substring( val = lv_c32 off = 20 len = 12 ) }|.
+    " ---- Standalone: save this one document ----
+    COMMIT ENTITIES BEGIN
+      RESPONSE OF i_journalentrytp
+      FAILED   DATA(ls_commit_failed)
+      REPORTED DATA(ls_commit_reported).
+    DATA(lv_rc) = sy-subrc.
+    COMMIT ENTITIES END.
 
-        DATA(lv_xml) = build_xml( it_batch = lt_valid
-                                  iv_msgid = lv_msgid
-                                  iv_hid   = lv_hid ).
-
-        DATA(lo_dest) = cl_http_destination_provider=>create_by_comm_arrangement(
-                          comm_scenario  = CONV #( c_comm_scenario )
-                          service_id     = CONV #( c_service_id )
-                          comm_system_id = CONV #( c_comm_system_id ) ).
-
-        DATA(lo_client) = cl_web_http_client_manager=>create_by_http_destination( lo_dest ).
-        DATA(lo_req)    = lo_client->get_http_request( ).
-        lo_req->set_uri_path( i_uri_path = c_path ).
-        lo_req->set_header_field( i_name = 'Content-Type' i_value = 'text/xml; charset=utf-8' ).
-        lo_req->set_header_field( i_name = 'SOAPAction'   i_value = c_action ).
-        lo_req->set_text( lv_xml ).
-
-        DATA(lo_resp)   = lo_client->execute( if_web_http_client=>post ).
-        DATA(ls_status) = lo_resp->get_status( ).
-        DATA(lv_text)   = lo_resp->get_text( ).
-        lo_client->close( ).
-
-        DATA(lv_is_html) = xsdbool( to_lower( lv_text ) CS '<html' ).
-
-        IF lv_is_html = abap_true.
-          lv_status  = 'ERROR'.
-          lv_message = |HTTP { ls_status-code }: login page returned - check user, password or path|.
-        ELSEIF ls_status-code >= 200 AND ls_status-code < 300.
-          lv_status  = 'SUBMITTED'.
-          lv_message = |Accepted for processing. Result: Message Dashboard or check the document|.
-        ELSE.
-          lv_status  = 'ERROR'.
-          lv_message = |HTTP { ls_status-code } { ls_status-reason }: { substring(
-                         val = lv_text
-                         len = nmin( val1 = strlen( lv_text ) val2 = 150 ) ) }|.
+    IF lv_rc = 0 AND ls_commit_failed IS INITIAL.
+      cs_result-status  = c_status_updated.
+      cs_result-message = |Reference updated to { is_rec-reference_id }|.
+    ELSE.
+      LOOP AT ls_commit_reported-journalentry INTO DATA(ls_crep).
+        IF ls_crep-%msg IS BOUND.
+          lv_msg = |{ lv_msg } { ls_crep-%msg->if_message~get_text( ) }|.
         ENDIF.
-
-      CATCH cx_http_dest_provider_error
-            cx_web_http_client_error
-            cx_uuid_error INTO DATA(lx).
-        lv_status  = 'ERROR'.
-        lv_message = |{ cl_abap_typedescr=>describe_by_object_ref( lx )->get_relative_name( ) }: { lx->get_text( ) }|.
-    ENDTRY.
-
-    " rows that passed the check get the result of the call
-    LOOP AT rt_results ASSIGNING FIELD-SYMBOL(<res>) WHERE status IS INITIAL.
-      <res>-message_id = lv_hid.
-      <res>-status     = lv_status.
-      <res>-message    = lv_message.
-    ENDLOOP.
+      ENDLOOP.
+      cs_result-status  = c_status_error.
+      cs_result-message = COND #( WHEN lv_msg IS INITIAL THEN 'Save failed'
+                                  ELSE condense( lv_msg ) ).
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

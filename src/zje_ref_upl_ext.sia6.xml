@@ -27,7 +27,7 @@
       <SRVC_NAME>8EF5703ACA632A3585E74990807CA5</SRVC_NAME>
       <SRVC_TYPE>HT</SRVC_TYPE>
       <UIAD_SRC>ZJE_REF_UPL_APP_UI5R</UIAD_SRC>
-      <TEXT>Service Binding for Upload</TEXT>
+      <TEXT>Service Binding For Upload ZUI_JE_REF_UPL</TEXT>
       <TYPE_TEXT>OData V4</TYPE_TEXT>
      </item>
     </SERVICE>
